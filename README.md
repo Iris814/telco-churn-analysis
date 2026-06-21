@@ -10,9 +10,10 @@ view. A product-analytics project: **business question first, model as a tool.**
   churn (3%).
 - **Catching churners:** a class-balanced model flags ~80% of churners vs. 56% for a
   default logistic model — at the cost of more false alarms.
-- **The real lever is the decision threshold, not the algorithm.** Every model *ranks*
-  churners similarly well (AUC ≈ 0.82–0.84); where you draw the "flag as churn" line is
-  a business call — the cost of a wasted retention offer vs. a lost customer.
+- **The real lever is the decision threshold, not the algorithm.** The strong models
+  *rank* churners similarly (AUC ≈ 0.82–0.85; a single unpruned tree is the exception at
+  0.66). Moving the cutoff from the naive 0.50 to the value-maximizing 0.14 is worth
+  **~$26K** of expected net value on the 2,113-customer test set — same model, same data.
 
 ## Dataset
 
@@ -33,16 +34,30 @@ services, churn flag). Public sample dataset, included in `data/`.
 
 ## Model comparison (test set = 2,113 customers)
 
-| Model | Churn recall | Churn precision | F1 | Accuracy |
-|---|:---:|:---:|:---:|:---:|
-| Logistic Regression | 0.56 | 0.67 | 0.61 | 0.81 |
-| Logistic Regression (balanced) | **0.80** | 0.51 | 0.62 | 0.74 |
-| Random Forest | 0.48 | 0.61 | 0.54 | 0.78 |
-| XGBoost (`scale_pos_weight=2.8`) | 0.66 | 0.53 | 0.59 | 0.76 |
+Metrics are computed from the fitted models in the notebook — not hand-typed. *Churn* is the positive class.
+
+| Model | Churn recall | Churn precision | F1 | Accuracy | ROC-AUC |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Logistic Regression | 0.56 | 0.67 | 0.61 | 0.81 | 0.845 |
+| Logistic Regression (balanced) | **0.80** | 0.51 | 0.62 | 0.74 | 0.844 |
+| Decision Tree (single, unpruned) | 0.50 | 0.50 | 0.50 | 0.73 | 0.659 |
+| Random Forest | 0.49 | 0.62 | 0.55 | 0.79 | 0.822 |
+| XGBoost (`scale_pos_weight=2.8`) | 0.67 | 0.53 | 0.59 | 0.76 | 0.815 |
+
+*5-fold stratified CV confirms the ranking is stable: Logistic Regression 0.845 ± 0.013, Random Forest 0.825 ± 0.012, XGBoost 0.822 ± 0.011.* The lone unpruned Decision Tree (AUC 0.66) is the outlier — which is exactly why we reach for ensembles.
+
+## The decision is the threshold — and it's worth real money
+
+![Retention ROI vs. threshold](assets/threshold_roi.png)
+
+The model only *ranks* customers; the business decides *where to cut*. At **$200 per save / $20 per offer**, the value-maximizing cutoff is **t ≈ 0.14**, not the default 0.50 — worth **+$26,320** of expected net value on the test set (**$80,040 vs. $53,720**):
+
+> **Net value = (churners caught × value of a save) − (everyone flagged × cost of an offer)**
 
 ## Next steps
 
 - Behavioral features (recent usage drop, support tickets, tenure milestones)
+- **Calibrate** the predicted probabilities so the dollar curve reflects true risk
 - Validate the chosen decision threshold against real offer economics
 
 ## Run
